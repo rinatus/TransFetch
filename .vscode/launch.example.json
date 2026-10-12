@@ -1,0 +1,44 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "KINOZAL_USERNAME": "YOUR_KINOZAL_USERNAME",
+                "KINOZAL_PASSWORD": "YOUR_KINOZAL_PASSWORD",
+                "IPINFO_TOKEN": "YOUR_IPINFO_TOKEN",
+                "TRANSMISSION_HOST": "YOUR_TRANSMISSION_HOST",
+                "TRANSMISSION_USERNAME": "YOUR_TRANSMISSION_USERNAME",
+                "TRANSMISSION_PASSWORD": "YOUR_TRANSMISSION_PASSWORD"
+            }
+        },
+        {
+            "name": "Python: Kinozal browser login",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_test.py",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "KINOZAL_USERNAME": "YOUR_KINOZAL_USERNAME",
+                "KINOZAL_PASSWORD": "YOUR_KINOZAL_PASSWORD",
+                "IPINFO_TOKEN": "YOUR_IPINFO_TOKEN",
+                "TRANSMISSION_HOST": "YOUR_TRANSMISSION_HOST",
+                "TRANSMISSION_USERNAME": "YOUR_TRANSMISSION_USERNAME",
+                "TRANSMISSION_PASSWORD": "YOUR_TRANSMISSION_PASSWORD"
+            },
+            "args": [
+                "--manual-login"
+            ]
+        }
+    ]
+}

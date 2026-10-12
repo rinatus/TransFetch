@@ -1,0 +1,12 @@
+.kinozal-browser/
+.kinozal-chrome/
+.kinozal-msedge/
+.kinozal-*/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.vscode/launch.json
+.env
+.env.*
+!.env.example

@@ -1,0 +1,144 @@
+{
+    "1968364": {
+      "COMMENT": " ****** DO NOT DELETE !!! **** Example of TARGET_BASE_DIR ******* ",
+      "IGNORE": true,
+      "parse_file_name": {
+      "str_from_start": "Aktrisy.S01.E",
+      "digits": 2
+      },
+
+    "file_name_example": "Aktrisy.S01.E02.2023.WEB-DL.2160p.HDR",
+
+    "TARGET_BASE_DIR": "\\\\Power-pc\\kino\\",
+    "target_dir": "РУС",
+    "name": "Актрисы"
+    },
+
+
+    "2147388": {
+      "COMMENT": " ****** DO NOT DELETE !!! **** Example of do not do_download ******* https://kinozal.guru/details.php?id=2147388 ",
+      "IGNORE": true,
+      "DOWNLOAD_VPN_ONLY": false,
+      "parse_file_name": {
+      "str_from_start": "|S01E|",
+      "digits": 2
+      },
+    "file_name_example": "Lucky S01E03 2160p ATVP WEB-DL DV HDR H 265.mkv",
+
+    "target_dir": "NEW/СЕРИАЛЫ/FOR",
+    "name": "Lucky"
+    },
+
+    "2076377": {
+      "COMMENT": " ****** DO NOT DELETE !!! **** Example of do not do_download ******* ",
+      "IGNORE": true,
+      "DOWNLOAD_VPN_ONLY": false,
+      "parse_file_name": {
+      "str_from_start": "|S01 E|",
+      "digits": 2
+      },
+    "file_name_example": "Paradise.2025.S01E05.2160p.HDR.Master5.mkv, Рай - Paradise S01 E02 (Синатра) WEB-DL 1080p (2025)",
+
+    "TARGET_BASE_DIR": "/run/user/1000/gvfs/smb-share:server=power-pc.local,share=kino/",
+    "target_dir": "SERIALS",
+    "name": "Paradise"
+    },
+
+    "2072732": {
+      "COMMENT": " ****** DO NOT DELETE !!! **** Example of do not do_download ******* ",
+      "IGNORE": true,
+      "DOWNLOAD_VPN_ONLY": false,
+      "parse_file_name": {
+      "str_from_start": "|S02E|",
+      "digits": 2
+      },
+    "file_name_example": "Severance.S02E03.2160p.WEB-DL.x265.DVp5.mp4",
+
+    "TARGET_BASE_DIR": "/run/user/1000/gvfs/smb-share:server=power-pc.local,share=kino/",
+    "target_dir": "SERIALS",
+    "name": "Severance"
+    },
+
+    "2036837": {
+      "IGNORE": true,
+      "DOWNLOAD_VPN_ONLY": false,
+      "parse_file_name": {
+      "str_from_start": "|S01E|",
+      "digits": 2
+      },
+    "file_name_example": "Dark.Matter.2024.S01E02.Trip.of.a.Lifetime.2160p.ATVP.WEB-DL.DV.HDR.NewComers",
+
+    "TARGET_BASE_DIR": "\\\\Power-pc\\kino\\",
+    "target_dir": "SERIALS",
+    "name": "Dark Matter"
+    },
+
+
+    "1930991": {
+      "IGNORE": false,
+      "parse_file_name": {
+      "str_from_start": "Goremyki.S01.E",
+      "digits": 2
+      },
+    "name": "Горемыки",
+    "file_name_example": "Goremyki.S01.E02.2022.WEBRip.1080p.mkv",
+    "target_dir": "NEW/СЕРИАЛЫ/РУС"
+    },
+
+    "2152056": {
+      "IGNORE": false,
+      "parse_file_name": {
+      "str_from_start": "|S02.E|",
+      "digits": 2
+      },
+    "name": "Олдскул",
+    "file_name_example": "*.mkv",
+    "target_dir": "NEW/СЕРИАЛЫ/РУС/2026"
+    },
+  
+    "2148177": {
+      "IGNORE": false,
+      "parse_file_name": {
+      "str_from_start": "|S01.E|",
+      "digits": 2
+      },
+    "name": "Похищение",
+    "file_name_example": "*.mkv",
+    "target_dir": "NEW/СЕРИАЛЫ/РУС/2026"
+    }, 
+
+
+    "2147383": {
+      "IGNORE": false,
+      "parse_file_name": {
+      "str_from_start": "|S01.E|",
+      "digits": 2
+      },
+    "name": "Холод",
+    "file_name_example": "Kholod.S01.E05.2025.WEB-DL.1080p.ExKinoRay.mkv",
+    "target_dir": "NEW/СЕРИАЛЫ/РУС/2026"
+    }, 
+    "2152237": {
+      "IGNORE": false,
+      "parse_file_name": {
+      "str_from_start": "|S01.E|",
+      "digits": 2
+      },
+    "name": "Трудно быть богом",
+    "file_name_example": "Kholod.S01.E05.2025.WEB-DL.1080p.ExKinoRay.mkv",
+    "target_dir": "NEW/СЕРИАЛЫ/РУС/2026"
+    }, 
+  
+  
+
+    "2105364": {
+      "IGNORE": true,
+      "parse_file_name": {
+      "str_from_start": "|S01.E|",
+      "digits": 2
+      },
+    "name": "Москва слезам не верит",
+    "file_name_example": "Moskva.slezam.ne.verit.Vse.tolko.nachinaetsya.S01.E01.2025.WEB-DL.1080p.ExKinoRay.mkv",
+    "target_dir": "NEW/СЕРИАЛЫ/РУС/2025"
+    }
+}
