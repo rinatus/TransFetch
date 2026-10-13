@@ -33,8 +33,8 @@ have no built-in account passwords or API tokens.
 The local `.vscode/launch.json` has these values under `env` for both debug
 configurations. Select **Python: Kinozal browser login** in Run and Debug, then
 press **F5** to run `main_test.py --manual-login`. **Python: Current File** also
-receives the variables. Complete Cloudflare verification and press Enter in the
-terminal when Kinozal's login form appears; the script submits your credentials.
+receives the variables. Complete Cloudflare verification during the 30-second
+pause; the script then submits your credentials automatically. No Enter is needed.
 
 `.vscode/launch.json` contains local secrets and is excluded from Git. The
 placeholder-only `.vscode/launch.example.json` can be committed. On a new checkout,
@@ -66,7 +66,7 @@ Chrome/Edge windows started by the older script before testing this correction.
 The launcher refuses to reuse a still-running browser from the old port=0 mode.
 See the [browser API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/webdriver).
 
-If the checkbox repeats, use manual verification mode from an interactive terminal:
+If the checkbox repeats, use manual verification mode:
 
 ```powershell
 .\.venv\Scripts\python.exe main_test.py --manual-login
@@ -74,17 +74,22 @@ If the checkbox repeats, use manual verification mode from an interactive termin
 
 Stop any other running scraper first. In the Chrome window opened/reused by this
 command, open `https://kinozal.guru/` and complete Cloudflare verification. The
-script waits at an Enter prompt **without attaching Playwright**. Press Enter
-when Kinozal's login form is visible. It then borrows that existing tab without
+script waits **30 seconds without attaching Playwright**, then continues
+automatically. It borrows the existing login tab without
 reloading it, fills and submits the configured credentials, waits for confirmed
-login, and scrapes the requested details page. If you already logged in, it skips
+login, scrapes the requested details page, and downloads its `.torrent` file. If you already logged in, it skips
 form submission and reuses that session. You may open that
-details page manually before pressing Enter to avoid another navigation. This
+details page manually during the pause to avoid another navigation. This
 mode keeps your tab open when the script finishes, including on errors.
 
+For more time, use `--manual-login --verification-wait 60`. This delay is separate
+from `--timeout`, which controls the subsequent login wait. If verification is
+still unfinished after the pause, the script disconnects and leaves your tabs
+open so you can finish the check and retry.
+
 This is a diagnostic fallback, not guaranteed clearance. If verification loops
-before you press Enter, this script's Playwright connection is not active. If it
-loops only after Enter or after navigating to details, browser scraping is still
+during the pause, this script's Playwright connection is not active. If it
+loops only after the pause or after navigating to details, browser scraping is still
 being challenged. Cloudflare lists browser automation as unsupported for solving
 [production challenges](https://developers.cloudflare.com/cloudflare-challenges/reference/supported-browsers/).
 For loops even with the script stopped, follow Cloudflare's
@@ -115,7 +120,7 @@ that Cloudflare will accept the session.
 Both browser modes read **both** `KINOZAL_USERNAME` and `KINOZAL_PASSWORD`
 from the environment, or accept explicit `username` and `password` arguments. Pass
 two empty strings (or set both environment variables empty) to disable automatic
-submission; in that case, finish login yourself before pressing Enter.
+submission; in that case, finish login yourself during the pause.
 Try `--browser --headless` for unattended use with credentials or a saved login.
 If Cloudflare does not finish in headless mode, run without `--headless`.
 Browser automation can still be challenged; it does not guarantee access.
@@ -140,8 +145,16 @@ finally:
 This test path uses browser navigation throughout. The original `connect2kinozal`
 and `main.py` still use requests. The returned Page cannot be passed to the old
 methods that expect `m_session.get(...)`. Use Playwright's `expect_download()`
-around a download-link click for files, and `download.save_as(...)` before closing
-the browser.
+and `download.save_as(...)` via `check.download_torrent_file_alt(2090510)` to save
+a torrent using the same browser session before closing the browser.
+
+Both `--browser` and `--manual-login` automatically download the selected `--id`
+after printing the page title. The file is saved as `torrents/[kinozal]id<ID>.torrent`
+and its size in **bytes** is printed. This is the torrent metadata file, not the
+media it describes. Use `--download-dir D:\Downloads` to choose another folder.
+Empty or invalid torrent responses fail the test without replacing an existing
+file. `torrents/` is excluded from Git. `--timeout` also controls how long to wait
+for the download to start; saving then waits for the transfer to finish.
 
 To manage the browser launch yourself, start normal Chrome with a separate
 debugging profile, log in there, and attach:

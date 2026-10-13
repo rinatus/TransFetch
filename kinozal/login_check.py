@@ -7,8 +7,11 @@ from utils.utils import GREEN, RED, ENDC
 from datetime import datetime
 import requests
 from pathlib import Path
-from time import monotonic
+from time import monotonic, sleep
+from math import isfinite
 from urllib.parse import urlsplit
+from tempfile import TemporaryDirectory
+from utils.torrent_decode import TDecoder
 # import requests
 # from requests import sessions
 
@@ -17,7 +20,7 @@ print(GREEN + f'Check login to kinozal' + ENDC)
 
 class CheckKinozal:
     URL_BASE = f'https://{KINOZAL_BASE}'
-    DL_URL_BASE = f'https://dl.{KINOZAL_BASE}'
+    DL_URL_BASE = f'https://{KINOZAL_BASE}'
     m_session = None
 
     def __init__(self):
@@ -29,7 +32,8 @@ class CheckKinozal:
 
     def connect2kinozal_alt(self, username=None, password=None, *,
                            headless=False, channel="chrome", timeout=180,
-                           profile_dir=None, cdp_url=None, manual_login=False):
+                           profile_dir=None, cdp_url=None, manual_login=False,
+                           verification_wait=30):
         """Return a logged-in Playwright Page for browser-based scraping.
 
         Credentials use KINOZAL_USERNAME / KINOZAL_PASSWORD from the environment.
@@ -44,12 +48,15 @@ class CheckKinozal:
         cdp_url to attach to a browser started with remote debugging enabled.
         The returned Page is not a requests.Session: use goto(), content(),
         locator(), and expect_download(). Call close_browser() when finished.
-        With manual_login=True, wait for Cloudflare verification and Enter before
-        attaching. Borrow the existing login tab and submit credentials there,
+        With manual_login=True, wait verification_wait seconds (default 30)
+        before attaching, without a terminal prompt. This pause is separate from
+        the login timeout. Borrow the existing login tab and submit credentials there,
         or reuse an already logged-in tab. That tab is left open.
         """
         if timeout <= 0:
             raise ValueError("timeout must be greater than zero")
+        if not isfinite(verification_wait) or verification_wait < 0:
+            raise ValueError("verification_wait must be a finite, non-negative number of seconds")
         if manual_login and (headless or (not cdp_url and channel not in ("chrome", "msedge"))):
             raise ValueError("manual_login needs visible Chrome/Edge or a visible browser's cdp_url")
         if username is None and password is None:
@@ -80,11 +87,9 @@ class CheckKinozal:
                 print(f"Scraper is disconnected. In that Chrome/Edge window, open {self.URL_BASE}/")
                 print("Complete Cloudflare verification. Leave the Kinozal login form or logged-in page open.")
                 if username and password:
-                    print("After Enter, the script will fill and submit your configured credentials if needed.")
-                try:
-                    input("Press Enter once Cloudflare is gone and the site is visible (Ctrl+C to cancel): ")
-                except EOFError as exc:
-                    raise RuntimeError("Manual login requires an interactive terminal for the Enter prompt") from exc
+                    print("After the pause, the script will fill and submit your configured credentials if needed.")
+                print(f"Continuing automatically in {verification_wait:g} seconds (Ctrl+C to cancel).", flush=True)
+                sleep(verification_wait)
             self._playwright = sync_playwright().start()
             if cdp_url:
                 self._attached_browser = self._playwright.chromium.connect_over_cdp(
@@ -107,11 +112,12 @@ class CheckKinozal:
                     if page is None:
                         raise RuntimeError(
                             "No Kinozal login form or logged-in tab was found. Finish Cloudflare "
-                            "verification in this browser before pressing Enter. The scraper will disconnect.")
+                            "verification in this browser and retry, or increase --verification-wait. "
+                            "The scraper will disconnect and leave your tabs open.")
                     if not username or not password:
                         raise ValueError(
                             "The login form is ready, but no credentials were supplied. Set both "
-                            "KINOZAL_USERNAME and KINOZAL_PASSWORD, or log in manually before Enter.")
+                            "KINOZAL_USERNAME and KINOZAL_PASSWORD, or log in manually during the pause.")
                 else:
                     # Own only this tab; leave the user's other tabs/browser open.
                     page = context.new_page()
@@ -180,6 +186,64 @@ class CheckKinozal:
         except BaseException:
             self.close_browser()
             raise
+
+    def download_torrent_file_alt(self, kin_ID: int, *, download_dir=None, timeout=180) -> int:
+        """Save a torrent using the connected browser and return its size in bytes.
+
+        timeout limits the wait for the download to start. Saving waits for the
+        transfer to finish. Existing files are replaced only after validation.
+        """
+        if not isfinite(timeout) or timeout <= 0:
+            raise ValueError("timeout must be a finite, positive number of seconds")
+        if not isinstance(kin_ID, int) or kin_ID <= 0:
+            raise ValueError("kin_ID must be a positive integer")
+        page = self.browser_page
+        if page is None or page.is_closed():
+            raise RuntimeError("Connect with connect2kinozal_alt() before downloading")
+        from playwright.sync_api import TimeoutError as BrowserTimeout
+
+        down_url = f"{self.DL_URL_BASE}/download.php?id={kin_ID}"
+        directory = (Path(download_dir) if download_dir is not None else
+                     Path(__file__).resolve().parents[1] / "torrents")
+        directory.mkdir(parents=True, exist_ok=True)
+        destination = directory.resolve() / f"[kinozal]id{kin_ID}.torrent"
+        try:
+            with page.expect_download(timeout=timeout * 1000) as pending:
+                # An ordinary browser link preserves cookies and the referring
+                # details page. Do not force HTML responses into a download.
+                page.evaluate("""url => {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                }""", down_url)
+            download = pending.value
+        except BrowserTimeout as exc:
+            raise TimeoutError(
+                "Torrent download did not start. The download page may require "
+                "verification/login, or the torrent may be unavailable. "
+                "Check the browser and retry."
+            ) from exc
+
+        # save_as also works over CDP; download.path() does not work remotely.
+        with TemporaryDirectory(prefix=".download-", dir=directory) as temporary:
+            candidate = Path(temporary) / "download.torrent"
+            download.save_as(str(candidate))
+            size = candidate.stat().st_size
+            if not size:
+                raise RuntimeError("Torrent download is empty")
+            try:
+                metadata = TDecoder(candidate.read_bytes()).decode()
+                if not isinstance(metadata, dict) or not isinstance(metadata.get(b"info"), dict):
+                    raise ValueError("Missing torrent info dictionary")
+            except (ValueError, TypeError, RuntimeError, EOFError, IndexError) as exc:
+                raise RuntimeError(
+                    "Downloaded response is not torrent metadata; it may be a login or error page"
+                ) from exc
+            candidate.replace(destination)
+        print(f"OK: browser torrent download, size: {size} bytes, saved: {destination}")
+        return size
 
     def close_browser(self, *, keep_tab=False):
         """Close the owned browser, or our attached tab unless kept for manual login."""
@@ -305,6 +369,7 @@ class CheckKinozal:
 def make_kinozal_check(check_download: bool, kino_id: int):
 
     kz_check = CheckKinozal()
+    print("Connecting to Kinozal...")
     kz_check.connect2kinozal()
 
     # kino_id = 1836772
@@ -326,7 +391,7 @@ def make_kinozal_check(check_download: bool, kino_id: int):
     if not check_download:
         return kz_check.m_session
 
-    torrent_sz_OK = 32502
+    torrent_sz_OK = 31892
     sz = kz_check.download_torrent_file(kino_id)
     if sz == torrent_sz_OK:
         print(GREEN + f'OK: download_torrent_file, size: {sz}' + ENDC)

@@ -173,7 +173,7 @@ class CKinozal:
     serials_map: Dict = None
     m_session = None
     URL_BASE = f'https://{KINOZAL_BASE}'
-    DL_URL_BASE = f'https://dl.{KINOZAL_BASE}'
+    DL_URL_BASE = f'https://{KINOZAL_BASE}'
 
     def __connect2kinozal(self):
         payload = get_login_payload()

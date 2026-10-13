@@ -11,6 +11,9 @@ from urllib.parse import parse_qs
 from kinozal.login_check import CheckKinozal
 from kinozal.browser import start_normal_browser
 
+TORRENT_BYTES = (b'd4:infod6:lengthi1e4:name4:test12:piece lengthi16384e'
+                 b'6:pieces20:12345678901234567890ee')
+
 
 class BrowserLauncherTests(unittest.TestCase):
     def test_explicit_nonzero_port_and_reuse(self):
@@ -47,6 +50,17 @@ class LoginHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         logged_in = "test_login=yes" in self.headers.get("Cookie", "")
+        if logged_in and self.path.startswith("/download.php?"):
+            torrent_id = parse_qs(self.path.split("?", 1)[1])["id"][0]
+            body = {"2": b"<html>Login required</html>", "3": b"",
+                    "4": b"d4:info"}.get(torrent_id, TORRENT_BYTES)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-bittorrent")
+            self.send_header("Content-Disposition", 'attachment; filename="server-name.torrent"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         # Like the live site, the login page can still show a form even with
         # valid cookies. Saved sessions must be checked on the home page.
         if logged_in and self.path != "/login.php":
@@ -97,6 +111,7 @@ class BrowserLoginTests(unittest.TestCase):
         self.addCleanup(self.profile.cleanup)
         self.check = CheckKinozal()
         self.check.URL_BASE = f"http://127.0.0.1:{self.server.server_port}"
+        self.check.DL_URL_BASE = self.check.URL_BASE
         self.addCleanup(self.check.close_browser)
 
     def connect(self, **kwargs):
@@ -125,11 +140,46 @@ class BrowserLoginTests(unittest.TestCase):
         page = self.connect(username="test-user", password="test-password", timeout=10)
         self.assertEqual(page.title(), "Logged in")
 
+    def test_download_uses_login_cookies_and_file_survives_browser_close(self):
+        page = self.connect(username="test-user", password="test-password", timeout=10)
+        page.goto(f"{self.check.URL_BASE}/details.php?id=1")
+        with TemporaryDirectory() as directory:
+            size = self.check.download_torrent_file_alt(1, download_dir=directory, timeout=5)
+            self.check.close_browser()
+            saved = Path(directory) / "[kinozal]id1.torrent"
+            self.assertEqual(size, len(TORRENT_BYTES))
+            self.assertEqual(saved.read_bytes(), TORRENT_BYTES)
+            self.assertEqual(list(Path(directory).iterdir()), [saved])
+
+    def test_invalid_download_preserves_existing_file(self):
+        self.connect(username="test-user", password="test-password", timeout=10)
+        with TemporaryDirectory() as directory:
+            for torrent_id in (2, 3, 4):
+                with self.subTest(torrent_id=torrent_id):
+                    saved = Path(directory) / f"[kinozal]id{torrent_id}.torrent"
+                    saved.write_bytes(TORRENT_BYTES)
+                    with self.assertRaisesRegex(RuntimeError, "empty|not torrent metadata"):
+                        self.check.download_torrent_file_alt(
+                            torrent_id, download_dir=directory, timeout=5)
+                    self.assertEqual(saved.read_bytes(), TORRENT_BYTES)
+            self.assertFalse(list(Path(directory).glob(".download-*")))
+
+    def test_download_html_navigation_reports_timeout(self):
+        page = self.connect(username="test-user", password="test-password", timeout=10)
+        page.context.clear_cookies()
+        with TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(TimeoutError, "download did not start"):
+                self.check.download_torrent_file_alt(1, download_dir=directory, timeout=1)
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
     def test_invalid_options_fail_before_browser_start(self):
         with self.assertRaises(ValueError):
             self.connect(timeout=0)
         with self.assertRaises(ValueError):
             self.connect(username="test-user")
+        for delay in (-1, float("inf"), float("nan")):
+            with self.assertRaises(ValueError):
+                self.connect(verification_wait=delay)
         self.assertIsNone(self.check._playwright)
 
     def test_manual_login_waits_before_attach_and_preserves_existing_tab(self):
@@ -138,20 +188,21 @@ class BrowserLoginTests(unittest.TestCase):
         page.locator.return_value.first.is_visible.return_value = True
         with patch("kinozal.browser.start_normal_browser", return_value="http://127.0.0.1:9222"), \
                 patch("playwright.sync_api.sync_playwright") as factory, \
-                patch("builtins.input") as prompt:
+                patch("kinozal.login_check.sleep") as pause:
             driver = factory.return_value.start.return_value
             context = driver.chromium.connect_over_cdp.return_value.contexts[0]
             context.pages = [page]
 
-            def confirm_login(_message):
-                # No automation connection exists while the user verifies.
+            def finish_pause(seconds):
+                self.assertEqual(seconds, 30)
                 factory.assert_not_called()
                 return ""
 
-            prompt.side_effect = confirm_login
+            pause.side_effect = finish_pause
             result = self.check.connect2kinozal_alt(
                 manual_login=True, profile_dir=self.profile.name)
             self.assertIs(result, page)
+            pause.assert_called_once_with(30)
             page.goto.assert_not_called()
             context.new_page.assert_not_called()
             self.check.close_browser()
@@ -163,7 +214,7 @@ class BrowserLoginTests(unittest.TestCase):
         page = MagicMock()
         page.url = f"{self.check.URL_BASE}/login.php"
         page.locator.return_value.first.is_visible.return_value = False
-        with patch("builtins.input", return_value=""), \
+        with patch("kinozal.login_check.sleep"), \
                 patch("playwright.sync_api.sync_playwright") as factory:
             driver = factory.return_value.start.return_value
             context = driver.chromium.connect_over_cdp.return_value.contexts[0]
@@ -188,7 +239,7 @@ class BrowserLoginTests(unittest.TestCase):
         unrelated.url = "https://unrelated.example/login.php"
         with patch.dict("os.environ", {
                 "KINOZAL_USERNAME": "test-user", "KINOZAL_PASSWORD": "test-password"}), \
-                patch("builtins.input", return_value=""), \
+                patch("kinozal.login_check.sleep"), \
                 patch("playwright.sync_api.sync_playwright") as factory:
             driver = factory.return_value.start.return_value
             context = driver.chromium.connect_over_cdp.return_value.contexts[0]
@@ -211,7 +262,7 @@ class BrowserLoginTests(unittest.TestCase):
         page.url = f"{self.check.URL_BASE}/login.php"
         page.locator.side_effect = lambda selector: MagicMock(
             first=MagicMock(is_visible=MagicMock(return_value=selector != 'a[href*="logout.php"]')))
-        with patch("builtins.input", return_value=""), \
+        with patch("kinozal.login_check.sleep"), \
                 patch("playwright.sync_api.sync_playwright") as factory:
             driver = factory.return_value.start.return_value
             context = driver.chromium.connect_over_cdp.return_value.contexts[0]
